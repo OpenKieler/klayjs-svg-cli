@@ -1,0 +1,26 @@
+{
+  "name": "klayjs-svg-cli",
+  "version": "0.1.0",
+  "author": {
+    "name": "Ulf Rueegg",
+    "email": "uru@informatik.uni-kiel.de"
+  },
+  "description": "Command line interface for klayjs-svg",
+  "bin": {
+    "klayjs-svg": "bin/klayjs-svg"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/OpenKieler/klayjs-svg-cli"
+  },
+  "dependencies": {
+    "json5": "^0.5.0",
+    "klayjs": "^0.4.0",
+    "klayjs-svg": "^0.1.0", 
+    "pretty-data": "^0.40.0",
+    "yargs": "^5.0.0"
+  },
+  "devDependencies": { },
+  "engines": { "node": ">=6.5.0" },
+  "license": "MIT"
+}

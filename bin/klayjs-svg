@@ -1,0 +1,172 @@
+#!/usr/bin/env node
+'use strict';
+
+const fs = require('fs');
+const path = require('path');
+const yargs = require('yargs');
+
+const JSON5 = require('json5');
+const pd = require('pretty-data').pd;
+
+const klay = require('klayjs');
+const klaysvg = require('klayjs-svg');
+
+// specify possible arguments
+const argv = yargs
+  .usage(`
+Usage: $0 input.json [...options]
+       $0 [...options] [STDIN]`)
+  .option('a', {
+    alias: 'arrows',
+    type: 'boolean',
+    describe: 'Add arrow heads to the edges'
+  })
+  .option('c', {
+    alias: 'centerLabels',
+    type: 'boolean',
+    describe: 'Centers node labels within their nodes (if layout is performed and not specified differently)'
+  })
+  .option('d', {
+    alias: 'defs',
+    type: 'array',
+    describe: 'Definitions to be added to the svg'
+  })
+  .option('n', {
+    alias: 'noLayout',
+    type: 'boolean',
+    describe: 'Does not lay out the input graph, useful if the graph already has been laid out'
+  })
+  .option('o', {
+    alias: 'output',
+    type: 'string',
+    describe: 'The output file'
+  })
+  .option('p', {
+    alias: 'pretty',
+    type: 'boolean',
+    describe: 'Pretty prints the svg output'
+  })
+  .option('s', {
+    alias: 'styles',
+    type: 'array',
+    describe: 'Style to be used'
+  })
+  .demand(0)
+  .addHelpOpt('help')
+  .argv;
+
+const allStyles = new Set(argv.styles || [].concat(klaysvg.styles.__defaults));
+const allDefs = new Set(argv.defs || [].concat(klaysvg.defs.__defaults));
+
+function configureCenterLabels(node) {
+  (node.children || []).forEach((c) => {
+    if (!c.children || !c.children.length) {
+      if (!c.properties) {
+        c.properties = {};
+      }
+      c.properties.nodeLabelPlacement = klaysvg.opts._.nodeLabelPlacement.insideCenterCenter;
+      (c.labels || []).forEach((l) => {
+        if (!l.class) {
+          l.class = [];
+        } else if (!Array.isArray(l.class)) {
+          l.class = [l.class];
+        }
+        l.class.push('center');
+      });
+    }
+    configureCenterLabels(c);
+  });
+}
+
+function renderSvg(graph, options, stdout = false) {
+  
+  const renderer = new klaysvg.Renderer();
+  let svg = renderer
+        .styles([...allStyles].map(s => klaysvg.styles[s]).join('\n'))
+        .defs([...allDefs].map(d => klaysvg.defs[d]).join('\n'))
+        .usedLayoutOptions(options)
+        .toSvg(graph);
+
+  if (argv.pretty) {
+    svg = pd.xml(svg);
+  }
+
+  if (stdout) {
+    console.log(svg);
+  } else {
+    const outputFilename = argv.output || path.basename(argv._[0], '.json') + '.svg';
+    fs.writeFileSync(outputFilename, svg, {
+      flag: 'wx'
+    });
+  }
+}
+
+function execute(input, stdout) {
+
+  if (typeof input !== 'string') {
+    throw new Error('Input must be a string');
+  }
+
+  let graph = JSON5.parse(input);
+  let options = {};
+
+  // is it an object wrapping the graph and the options?
+  if (graph.graph) {
+    if (graph.options) {
+      options = graph.options;
+    }
+    graph = graph.graph;
+  }
+
+  if (argv.centerLabels) {
+    allStyles.add('centerLabels');
+    configureCenterLabels(graph);
+  }
+
+  if (argv.arrows) {
+    allStyles.add('arrows');
+    allDefs.add('arrows');
+  }
+  
+  // perform layout
+  if (argv.noLayout) {
+    renderSvg(graph, stdout);
+  } else {
+    klay.layout({
+      graph: graph,
+      options: options,
+      success(g) {
+        renderSvg(graph, options, stdout); 
+      },
+      error(e) {
+        console.log(e);
+      }
+    });
+  }
+}
+
+/** either read from file or from stdin */
+let input;
+if (argv._.length == 0) {
+  // stdin
+  const readline = require('readline');
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+    terminal: false
+  });
+
+  input = '';
+  rl.on('line', function(line) {
+    input += line;
+  });
+
+  rl.on('close', function() {
+    execute(input, true);
+  });
+
+} else {
+  // input file
+  input = fs.readFileSync(argv._[0]);
+  execute(input);
+}
