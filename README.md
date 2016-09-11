@@ -11,8 +11,8 @@ npm install klayjs-svg-cli
 ```
 
 ```
-Usage: klayjs-svg-cli.js input.json [...options]
-       klayjs-svg-cli.js [...options] [STDIN]
+Usage: klayjs-svg input.json [...options]
+       klayjs-svg [...options] [STDIN]
 
 Options:
   -a, --arrows        Add arrow heads to the edges                     [boolean]
